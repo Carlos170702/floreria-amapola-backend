@@ -1,5 +1,4 @@
 const {
-  getUsuarioByIdDB,
   getFlowersDB,
   getColorsDB,
   getCiudadesDB,
@@ -15,10 +14,12 @@ const {
   getProductsDB,
   DeleteProviderDB,
   updateDataProviderDB,
+  loginDB,
+  addUserDB,
 } = require("../../DB/mysql");
 
-const getUsuarioByUser = (user) => {
-  return getUsuarioByIdDB("tUsuarios", user);
+const login = (data) => {
+  return loginDB("tUsuarios", data);
 };
 
 const getFlowers = () => {
@@ -81,8 +82,12 @@ const updateDataProvider = (newDataProvider) => {
   return updateDataProviderDB("tProveedor", newDataProvider);
 };
 
+const addUser = (dataUser) => {
+  return addUserDB(dataUser);
+};
+
 module.exports = {
-  getUsuarioByUser,
+  login,
   getFlowers,
   getColors,
   getTypes,
@@ -98,4 +103,5 @@ module.exports = {
   getProducts,
   DeleteProvider,
   updateDataProvider,
+  addUser,
 };

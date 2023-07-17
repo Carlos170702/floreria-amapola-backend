@@ -1,6 +1,8 @@
 const connection = require("./connection");
+const jwt = require("jsonwebtoken");
 
-const getUsuarioByIdDB = async (table, user) => {
+const loginDB = async (table, dataUser) => {
+  const { User, Password } = dataUser;
   return new Promise((resolve, reject) => {
     connection.query(
       `select  tUsuarios.CvUsuarios,
@@ -21,12 +23,17 @@ const getUsuarioByIdDB = async (table, user) => {
        from ${table} 
        inner join tDireccion on tUsuarios.CvDireccion like tDireccion.CvDireccion
        inner join cRol on tUsuarios.CvRol like cRol.CvRol 
-       where Usuario like '${user}';`,
+       where Usuario like '${User}';`,
       (err, result) => {
-        if (result.length === 0) {
-          const error = new Error("No se encontraro el usuario");
-          reject(error);
+        // validar si existe el usuario y si la contrasena es valida
+        if (result.length === 0 || result[0].contrasena !== Password) {
+          return reject("Usuario no valido o contraseña no valida");
         }
+
+        // Generartoken
+        const token = jwt.sign(result[0].CvUsuarios, process.env.TOKEN_SECRET);
+        result[0].token = token;
+
         return !!err ? reject(err) : resolve(result[0]);
       }
     );
@@ -110,7 +117,7 @@ const updateUSerDB = async (table, dataUser) => {
 const updateDirectionDB = async (table, dataDirection) => {
   return new Promise((resolve, reject) => {
     connection.query(
-      `update tDireccion 
+      `update ${table} 
        set 
         NumCas = '${dataDirection?.NumCas}', 
         Calle= '${dataDirection?.Calle}', 
@@ -125,7 +132,7 @@ const updateDirectionDB = async (table, dataDirection) => {
   });
 };
 
-const getProvidersDB = async (table, dataDirection) => {
+const getProvidersDB = async (table) => {
   return new Promise((resolve, reject) => {
     connection.query(
       `SELECT
@@ -249,8 +256,104 @@ const updateDataProviderDB = async (table, newDataProvider) => {
   });
 };
 
+// Para verificar el usaurio y su rol
+const getUserById = (id) => {
+  return new Promise((resolve, reject) => {
+    connection.query(
+      `select  tUsuarios.CvUsuarios,
+      tUsuarios.Telefono,
+      tUsuarios.ApePaterno,
+      tUsuarios.ApeMaterno,
+      tUsuarios.Nombre,
+      tUsuarios.Usuario,
+      tUsuarios.Correo,
+      tUsuarios.contrasena,
+      cRol.DsRol,
+      tDireccion .CvDireccion,
+      tDireccion.NumCas,
+      tDireccion.Calle,
+      tDireccion.CvCiudad,
+      tDireccion.CvEstado,
+      tDireccion.CvPais
+     from tUsuarios 
+     inner join tDireccion on tUsuarios.CvDireccion like tDireccion.CvDireccion
+     inner join cRol on tUsuarios.CvRol like cRol.CvRol 
+     where CvUsuarios like '${id}';`,
+      (err, result) => {
+        return !!err ? reject(err) : resolve(result[0]);
+      }
+    );
+  });
+};
+
+const addUserDB = (dataUser) => {
+  const {
+    Telefono,
+    ApePaterno,
+    ApeMaterno,
+    Nombre,
+    Usuario,
+    Correo,
+    Contrasena,
+    NumCas,
+    Calle,
+    CvCiudad,
+    CvEstado,
+    CvPais,
+    CvRol,
+  } = dataUser;
+
+  return new Promise((resolve, reject) => {
+    connection.beginTransaction((err) => {
+      if (err) {
+        throw err;
+      }
+      // add direction
+      connection.query(
+        `INSERT INTO tDireccion (NumCas, Calle, CvCiudad, CvEstado, CvPais) 
+        VALUES ('${NumCas}', '${Calle}', ${CvCiudad}, ${CvEstado}, ${CvPais});`,
+        (err, result) => {
+          if (err) {
+            connection.rollback(() => {
+              reject("Ocurrio un error");
+            });
+          }
+          // add user
+          connection.query(
+            `INSERT INTO 
+              tUsuarios (Telefono, ApePaterno, ApeMaterno, Nombre, Usuario, Correo, Contrasena, CvRol, CvDireccion) 
+            VALUES ('${Telefono}', '${ApePaterno}', '${ApeMaterno}', '${Nombre}', '${Usuario}', '${Correo}', '${Contrasena}', ${CvRol}, ${result.insertId});`,
+            (err, result) => {
+              if (err) {
+                connection.rollback(() => {
+                  reject("Ocurrio un error");
+                });
+              }
+
+              connection.commit((err) => {
+                if (err) {
+                  connection.rollback(() => {
+                    reject("Ocurrio un error");
+                  });
+                }
+
+                // Generartoken
+                const token = jwt.sign(
+                  result.insertId,
+                  process.env.TOKEN_SECRET
+                );
+                resolve(token);
+              });
+            }
+          );
+        }
+      );
+    });
+  });
+};
+
 module.exports = {
-  getUsuarioByIdDB,
+  loginDB,
   getFlowersDB,
   getColorsDB,
   getTypesDB,
@@ -266,4 +369,6 @@ module.exports = {
   getProductsDB,
   DeleteProviderDB,
   updateDataProviderDB,
+  getUserById,
+  addUserDB,
 };

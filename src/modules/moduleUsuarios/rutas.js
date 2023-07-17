@@ -1,6 +1,6 @@
 const express = require("express");
+const JWT = require("jsonwebtoken");
 const {
-  getUsuarioByUser,
   getFlowers,
   getColors,
   getCiudades,
@@ -16,17 +16,20 @@ const {
   getProducts,
   DeleteProvider,
   updateDataProvider,
+  login,
+  addUser,
 } = require("../moduleProductos/controllers");
+const { validateJWT } = require("../../middleware/validateJWT");
 
 const router = express.Router();
 
-router.get("/getusuario/:user", async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
-    const dataUsuarios = await getUsuarioByUser(req.params.user);
+    const dataLogin = await login(req.body);
     res.json({
       error: false,
       status: 200,
-      message: dataUsuarios,
+      message: dataLogin,
     });
   } catch (e) {
     res.json({
@@ -36,6 +39,8 @@ router.get("/getusuario/:user", async (req, res) => {
     });
   }
 });
+
+router.post("/validarToken", validateJWT);
 
 router.get("/getFlowers", async (req, res) => {
   try {
@@ -282,6 +287,24 @@ router.post("/updateProvider", async (req, res) => {
       error: false,
       status: 200,
       message: dataUpdateProvider,
+    });
+  } catch (e) {
+    res.json({
+      error: true,
+      status: 500,
+      message: e,
+    });
+  }
+});
+
+router.post("/addUser", async (req, res) => {
+
+  try {
+    const dataAddUser = await addUser(req.body);
+    res.json({
+      error: false,
+      status: 200,
+      message: dataAddUser,
     });
   } catch (e) {
     res.json({
