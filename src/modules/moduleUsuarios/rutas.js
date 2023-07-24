@@ -1,5 +1,4 @@
 const express = require("express");
-const JWT = require("jsonwebtoken");
 const {
   getFlowers,
   getColors,
@@ -18,6 +17,10 @@ const {
   updateDataProvider,
   login,
   addUser,
+  DeleteProduct,
+  updateDataProduct,
+  getTipoPago,
+  addToVenta,
 } = require("../moduleProductos/controllers");
 const { validateJWT } = require("../../middleware/validateJWT");
 
@@ -246,9 +249,9 @@ router.post("/addProduct", async (req, res) => {
   }
 });
 
-router.post("/getProducts", async (req, res) => {
+router.get("/getProducts", async (req, res) => {
   try {
-    const dataGetProducts = await getProducts(req.body);
+    const dataGetProducts = await getProducts();
     res.json({
       error: false,
       status: 200,
@@ -280,6 +283,23 @@ router.delete("/deleteProvider/:id", async (req, res) => {
   }
 });
 
+router.delete("/deleteProduct/:id", async (req, res) => {
+  try {
+    const dataDeleteProduct = await DeleteProduct(req.params.id);
+    res.json({
+      error: false,
+      status: 200,
+      message: dataDeleteProduct,
+    });
+  } catch (e) {
+    res.json({
+      error: true,
+      status: 500,
+      message: e,
+    });
+  }
+});
+
 router.post("/updateProvider", async (req, res) => {
   try {
     const dataUpdateProvider = await updateDataProvider(req.body);
@@ -298,13 +318,63 @@ router.post("/updateProvider", async (req, res) => {
 });
 
 router.post("/addUser", async (req, res) => {
-
   try {
     const dataAddUser = await addUser(req.body);
     res.json({
       error: false,
       status: 200,
       message: dataAddUser,
+    });
+  } catch (e) {
+    res.json({
+      error: true,
+      status: 500,
+      message: e,
+    });
+  }
+});
+
+router.post("/updateProduct", async (req, res) => {
+  try {
+    const dataUpdateProduct = await updateDataProduct(req.body);
+    res.json({
+      error: false,
+      status: 200,
+      message: dataUpdateProduct,
+    });
+  } catch (e) {
+    res.json({
+      error: true,
+      status: 500,
+      message: e,
+    });
+  }
+});
+
+router.get("/getTipoPago", async (req, res) => {
+  try {
+    const dataTipoPago = await getTipoPago();
+    res.json({
+      error: false,
+      status: 200,
+      message: dataTipoPago,
+    });
+  } catch (e) {
+    res.json({
+      error: true,
+      status: 500,
+      message: e,
+    });
+  }
+});
+
+router.post("/addToVenta", async (req, res) => {
+  try {
+    const dataToVenta = await addToVenta(req?.body);
+    res.json({
+      error: false,
+      status: 200,
+      message: dataToVenta,
     });
   } catch (e) {
     res.json({

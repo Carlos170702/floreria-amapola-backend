@@ -1,5 +1,6 @@
 const connection = require("./connection");
 const jwt = require("jsonwebtoken");
+const CryptoJS = require("crypto-js");
 
 const loginDB = async (table, dataUser) => {
   const { User, Password } = dataUser;
@@ -25,8 +26,10 @@ const loginDB = async (table, dataUser) => {
        inner join cRol on tUsuarios.CvRol like cRol.CvRol 
        where Usuario like '${User}';`,
       (err, result) => {
+        // encripta la contraseña enviada de login para poder compararla con la encriptada de la base de datos
+        const verifyPass = CryptoJS.SHA256(Password).toString();
         // validar si existe el usuario y si la contrasena es valida
-        if (result.length === 0 || result[0].contrasena !== Password) {
+        if (result.length === 0 || result[0].contrasena !== verifyPass) {
           return reject("Usuario no valido o contraseña no valida");
         }
 
@@ -81,7 +84,7 @@ const getCiudadesDB = async (table) => {
 
 const getEstadosDB = async (table) => {
   return new Promise((resolve, reject) => {
-    connection.query(`SELECT * FROM ${table};`, (err, result) => {
+    connection.query(`select * from ${table};`, (err, result) => {
       return !!err ? reject(err) : resolve(result);
     });
   });
@@ -198,25 +201,74 @@ const InsertToDirectionDB = async (table, dataDirection) => {
 };
 
 const InsertToProductsDB = async (table, dataProduct) => {
-  console.log(dataProduct);
-  const { imageURL, Caracteristicas, Nombre, CvColor, CvTipo } = dataProduct;
+  const {
+    imageURL,
+    Caracteristicas,
+    Nombre,
+    CvColor,
+    CvTipo,
+    Existencia,
+    Stock,
+    PreVenta,
+    Preccompra,
+  } = dataProduct;
 
   return new Promise((resolve, reject) => {
-    connection.query(
-      `INSERT INTO ${table} (imageURL, Caracteristicas, Nombre, CvColor, CvTipo)
-      VALUE ('${imageURL}', '${Caracteristicas}', '${Nombre}', ${CvColor}, ${CvTipo});`,
-      (err, result) => {
-        return !!err ? reject(err) : resolve(result);
+    connection.beginTransaction((error) => {
+      if (error) {
+        reject("Error al agregar producto");
       }
-    );
+
+      // agregar producto
+      connection.query(
+        `INSERT INTO ${table} (imageURL, Caracteristicas, Nombre, CvColor, CvTipo)
+        VALUE ('${imageURL}', '${Caracteristicas}', '${Nombre}', ${CvColor}, ${CvTipo});`,
+        (err, result) => {
+          if (err) {
+            connection.rollback(() => {
+              reject("Error al agregar producto");
+            });
+          }
+
+          connection.query(
+            `INSERT INTO mInventario (PreVenta, Preccompra, Existencia, Stock, CvProducto) 
+            VALUES (${PreVenta}, ${Preccompra}, ${Existencia}, ${Stock}, ${result?.insertId});`,
+            (err, result) => {
+              if (err) {
+                connection.rollback(() => {
+                  reject("Error al agregar producto");
+                });
+              }
+
+              connection.commit((err) => {
+                if (err) {
+                  connection.rollback(() => {
+                    reject("Ocurrio un error");
+                  });
+                }
+
+                resolve("Producto agregado");
+              });
+            }
+          );
+        }
+      );
+    });
   });
 };
 
 const getProductsDB = async (table) => {
   return new Promise((resolve, reject) => {
-    connection.query(`select * from ${table};`, (err, result) => {
-      return !!err ? reject(err) : resolve(result);
-    });
+    connection.query(
+      `SELECT m.CvInventario, m.PrecCompra, m.PreVenta, m.Stock, m.Existencia, p.CvProducto, p.imageURL, p.Caracteristicas, p.Nombre, c.CvColor, c.DsColor as Color,t.CvTipo, t.DsTipo as Tipo
+      FROM ${table} m
+      INNER JOIN tProducto p ON m.CvProducto = p.CvProducto
+      INNER JOIN cColor c ON p.CvColor = c.CvColor
+      INNER JOIN cTipo t ON p.CvTipo = t.CvTipo;`,
+      (err, result) => {
+        return !!err ? reject(err) : resolve(result);
+      }
+    );
   });
 };
 
@@ -230,6 +282,22 @@ const DeleteProviderDB = async (table, id) => {
           reject(error);
         }
         return !!err ? reject(err) : resolve(result);
+      }
+    );
+  });
+};
+
+const DeleteProductDB = async (table, id) => {
+  return new Promise((resolve, reject) => {
+    connection.query(
+      `delete from ${table} where CvInventario = ${id};`,
+      (err, result) => {
+        if (result?.affectedRows === 0) {
+          reject("Producto no encontrado");
+        }
+        return !!err
+          ? reject(err)
+          : resolve("Producto eliminado correctamente");
       }
     );
   });
@@ -303,6 +371,8 @@ const addUserDB = (dataUser) => {
     CvRol,
   } = dataUser;
 
+  const hashedPassword = CryptoJS.SHA256(Contrasena).toString();
+
   return new Promise((resolve, reject) => {
     connection.beginTransaction((err) => {
       if (err) {
@@ -322,7 +392,7 @@ const addUserDB = (dataUser) => {
           connection.query(
             `INSERT INTO 
               tUsuarios (Telefono, ApePaterno, ApeMaterno, Nombre, Usuario, Correo, Contrasena, CvRol, CvDireccion) 
-            VALUES ('${Telefono}', '${ApePaterno}', '${ApeMaterno}', '${Nombre}', '${Usuario}', '${Correo}', '${Contrasena}', ${CvRol}, ${result.insertId});`,
+            VALUES ('${Telefono}', '${ApePaterno}', '${ApeMaterno}', '${Nombre}', '${Usuario}', '${Correo}', '${hashedPassword}', ${CvRol}, ${result.insertId});`,
             (err, result) => {
               if (err) {
                 connection.rollback(() => {
@@ -352,6 +422,146 @@ const addUserDB = (dataUser) => {
   });
 };
 
+const updateDataProductDB = async (newDataProduct) => {
+  console.log("producto mandado", newDataProduct);
+  const {
+    imageURL,
+    Caracteristicas,
+    Nombre,
+    CvColor,
+    CvTipo,
+    PreVenta,
+    Preccompra,
+    Existencia,
+    Stock,
+    CvProducto,
+    CvInventario,
+  } = newDataProduct;
+
+  return new Promise((resolve, reject) => {
+    connection.beginTransaction((err) => {
+      if (err) {
+        return reject("Error al actualizar");
+      }
+
+      connection.query(
+        `update tProducto 
+        set imageURL = '${imageURL}', Caracteristicas='${Caracteristicas}', Nombre = '${Nombre}', CvColor=${CvColor}, CvTipo=${CvTipo}
+        where CvProducto = ${CvProducto};`,
+        (err, result) => {
+          if (err) {
+            connection.rollback(() => {
+              return reject("Error al actualizar datos del producto");
+            });
+          }
+
+          if (result.affectedRows <= 0) {
+            connection.rollback(() => {
+              return reject("Error al actualizar Datos Producto no encontrado");
+            });
+          }
+
+          connection.query(
+            `update mInventario 
+            set PreVenta = ${PreVenta}, Preccompra = ${Preccompra}, Existencia = ${Existencia}, Stock = ${Stock}
+            where CvInventario = ${CvInventario};`,
+            (err, result) => {
+              if (err) {
+                connection.rollback(() => {
+                  return reject("Error al actualizar datos del producto");
+                });
+              }
+
+              console.log(err);
+              if (result.affectedRows <= 0) {
+                connection.rollback(() => {
+                  return reject(
+                    "Error al actualizar Datos Producto no encontrado"
+                  );
+                });
+              }
+
+              connection.commit((err) => {
+                if (err) {
+                  connection.rollback(() => {
+                    return reject("Ocurrio un error");
+                  });
+                }
+
+                resolve("Producto actualizado");
+              });
+            }
+          );
+        }
+      );
+    });
+  });
+};
+
+const getTipoPagoDB = async (table) => {
+  return new Promise((resolve, reject) => {
+    connection.query(`select * from ${table};`, (err, result) => {
+      return !!err ? reject(err) : resolve(result);
+    });
+  });
+};
+
+const addToVentaDB = async (dataVenta) => {
+  return new Promise((resolve, reject) => {
+
+    if (dataVenta?.flowers.length <= 0) {
+      return reject("Ningun Producto encontrado");
+    }
+
+    connection.beginTransaction((err) => {
+      if (err) {
+        return reject("Error al insertar");
+      }
+
+      // añade en tVenta
+      connection.query(
+        `INSERT INTO tVenta (Subtotal, Iva, Total, FechaVenta, CvUsuario, CvTipoDePago) VALUES ( 100.50, 16.08, 116.58, '2023-04-01', 1, 1);`,
+        (err, result) => {
+          console.log(err);
+          if (err) {
+            connection.rollback(() => {
+              reject("Error al hacer venta");
+            });
+          }
+
+          const CvVenta = result.insertId;
+
+          const insertions = dataVenta.map((producto) => {
+            const { Subtotal, Total, Cantidad, CvInventario } = producto;
+            const ventaUnitariaQuery = `INSERT INTO tVentaUnitaria (Subtotal, Total, Cantidad, CvInventario, CvVenta) VALUES (?, ?, ?, ?, ?);`;
+            const ventaUnitariaValues = [Subtotal, Total, Cantidad, CvInventario, CvVenta];
+
+            return new Promise((resolve, reject) => {
+              connection.query(ventaUnitariaQuery, ventaUnitariaValues, (err) => {
+                if (err) {
+                  reject("Error al hacer venta");
+                } else {
+                  resolve();
+                }
+              });
+            });
+          });
+
+          connection.commit((err) => {
+            if (err) {
+              connection.rollback(() => {
+                reject("Error al hacer venta");
+              });
+            }
+
+            resolve(result);
+          });
+        }
+      );
+    });
+  });
+};
+
 module.exports = {
   loginDB,
   getFlowersDB,
@@ -371,4 +581,8 @@ module.exports = {
   updateDataProviderDB,
   getUserById,
   addUserDB,
+  DeleteProductDB,
+  updateDataProductDB,
+  getTipoPagoDB,
+  addToVentaDB,
 };

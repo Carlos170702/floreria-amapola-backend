@@ -16,6 +16,11 @@ const {
   updateDataProviderDB,
   loginDB,
   addUserDB,
+  sendEmailDB,
+  DeleteProductDB,
+  updateDataProductDB,
+  getTipoPagoDB,
+  addToVentaDB,
 } = require("../../DB/mysql");
 
 const login = (data) => {
@@ -71,11 +76,15 @@ const InsertToProducts = (dataProduct) => {
 };
 
 const getProducts = () => {
-  return getProductsDB("tProducto");
+  return getProductsDB("mInventario");
 };
 
 const DeleteProvider = (id) => {
   return DeleteProviderDB("tProveedor", id);
+};
+
+const DeleteProduct = (id) => {
+  return DeleteProductDB("mInventario", id);
 };
 
 const updateDataProvider = (newDataProvider) => {
@@ -84,6 +93,18 @@ const updateDataProvider = (newDataProvider) => {
 
 const addUser = (dataUser) => {
   return addUserDB(dataUser);
+};
+
+const updateDataProduct = (newDataProduct) => {
+  return updateDataProductDB(newDataProduct);
+};
+
+const getTipoPago = () => {
+  return getTipoPagoDB("cTipoDePago");
+};
+
+const addToVenta = (dataVenta) => {
+  return addToVentaDB(dataVenta);
 };
 
 module.exports = {
@@ -104,4 +125,8 @@ module.exports = {
   DeleteProvider,
   updateDataProvider,
   addUser,
+  DeleteProduct,
+  updateDataProduct,
+  getTipoPago,
+  addToVenta,
 };
