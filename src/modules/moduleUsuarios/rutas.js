@@ -21,8 +21,10 @@ const {
   updateDataProduct,
   getTipoPago,
   addToVenta,
+  recoveryPassController,
 } = require("../moduleProductos/controllers");
 const { validateJWT } = require("../../middleware/validateJWT");
+const { recoveryPass } = require("../../config/mailer");
 
 const router = express.Router();
 
@@ -385,4 +387,21 @@ router.post("/addToVenta", async (req, res) => {
   }
 });
 
+
+router.post('/recovery-pass', async (req, res)=>{
+  try {
+    const recovery = await recoveryPassController(req.body);
+    res.json({
+      error: false,
+      status: 200,
+      message: recovery,
+    });
+  } catch (e) {
+    res.json({
+      error: true,
+      status: 500,
+      message: e,
+    });
+  }
+})
 module.exports = router;

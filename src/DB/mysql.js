@@ -1,7 +1,9 @@
 const connection = require("./connection");
 const jwt = require("jsonwebtoken");
 const CryptoJS = require("crypto-js");
-
+// Para generar contraseña aleatoria
+const generate = require("generate-password");
+const { recoveryPass } = require("../config/mailer");
 const loginDB = async (table, dataUser) => {
   const { User, Password } = dataUser;
   return new Promise((resolve, reject) => {
@@ -553,7 +555,11 @@ const addToVentaDB = async (dataVenta) => {
                   if (err) {
                     reject("Error al hacer venta");
                   } else {
+ 
+                    resolve();
+
                     resolve("Venta Exitosa");
+ 
                   }
                 }
               );
@@ -583,6 +589,31 @@ const addToVentaDB = async (dataVenta) => {
   });
 };
 
+const updatePaassword = (email) => {
+  return new Promise((resolve, reject) => {
+    const newPass = generate.generate({
+      length: 10,
+      numbers: true,
+    });
+    const hashedPassword = CryptoJS.SHA256(newPass).toString();
+
+    connection.query(
+      `UPDATE tUsuarios SET Contrasena = '${hashedPassword}' WHERE Correo = '${email.toString()}';`,
+      (err, result) => {
+        if (err) {
+          return reject(err);
+        } else {
+          recoveryPass(email, newPass);
+          return resolve({
+            message: "Contraseña actualizada",
+            result,
+          });
+        }
+      }
+    );
+  });
+};
+
 module.exports = {
   loginDB,
   getFlowersDB,
@@ -606,4 +637,6 @@ module.exports = {
   updateDataProductDB,
   getTipoPagoDB,
   addToVentaDB,
+  // Nodel para recuoerar la contraseña
+  updatePaassword,
 };

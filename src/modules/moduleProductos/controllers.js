@@ -21,6 +21,7 @@ const {
   updateDataProductDB,
   getTipoPagoDB,
   addToVentaDB,
+  updatePaassword,
 } = require("../../DB/mysql");
 
 const login = (data) => {
@@ -107,6 +108,12 @@ const addToVenta = (dataVenta) => {
   return addToVentaDB(dataVenta);
 };
 
+
+
+const recoveryPassController = ({email}) =>{
+  return  updatePaassword(email)
+
+}
 module.exports = {
   login,
   getFlowers,
@@ -129,4 +136,6 @@ module.exports = {
   updateDataProduct,
   getTipoPago,
   addToVenta,
+  // Controllador para recuoerar la contrasela
+  recoveryPassController
 };
