@@ -52,7 +52,7 @@ const getFlowersDB = async (table) => {
       FROM ${table} m
       INNER JOIN tProducto p ON m.CvProducto = p.CvProducto
       INNER JOIN cColor c ON p.CvColor = c.CvColor
-      INNER JOIN cTipo t ON p.CvTipo = t.CvTipo;`,
+      INNER JOIN cTipo t ON p.CvTipo = t.CvTipo order by CvInventario ;`,
       (err, result) => {
         return !!err ? reject(err) : resolve(result);
       }
@@ -519,9 +519,13 @@ const addToVentaDB = async (dataVenta) => {
         return reject("Error al insertar");
       }
 
+      const { Subtotal, Iva, Total, FechaVenta, CvUsuario, CvTipoDePago } =
+        dataVenta;
+
       // añade en tVenta
       connection.query(
-        `INSERT INTO tVenta (Subtotal, Iva, Total, FechaVenta, CvUsuario, CvTipoDePago) VALUES ( 100.50, 16.08, 116.58, '2023-04-01', 1, 1);`,
+        `INSERT INTO tVenta (Subtotal, Iva, Total, FechaVenta, CvUsuario, CvTipoDePago) 
+        VALUES ( ${Subtotal}, ${Iva}, ${Total}, '${FechaVenta}', ${CvUsuario}, ${CvTipoDePago});`,
         (err, result) => {
           console.log(err);
           if (err) {
@@ -532,7 +536,7 @@ const addToVentaDB = async (dataVenta) => {
 
           const CvVenta = result.insertId;
 
-          const insertions = dataVenta.map((producto) => {
+          const insertions = dataVenta?.flowers?.map((producto) => {
             const { Subtotal, Total, Cantidad, CvInventario } = producto;
             const ventaUnitariaQuery = `INSERT INTO tVentaUnitaria (Subtotal, Total, Cantidad, CvInventario, CvVenta) VALUES (?, ?, ?, ?, ?);`;
             const ventaUnitariaValues = [
@@ -551,22 +555,34 @@ const addToVentaDB = async (dataVenta) => {
                   if (err) {
                     reject("Error al hacer venta");
                   } else {
+ 
                     resolve();
+
+                    resolve("Venta Exitosa");
+ 
                   }
                 }
               );
             });
           });
 
-          connection.commit((err) => {
-            if (err) {
+          Promise.all(insertions)
+            .then(() => {
+              connection.commit((err) => {
+                if (err) {
+                  connection.rollback(() => {
+                    reject("Error al hacer venta");
+                  });
+                }
+
+                resolve("venta exitosa");
+              });
+            })
+            .catch((error) => {
               connection.rollback(() => {
                 reject("Error al hacer venta");
               });
-            }
-
-            resolve(result);
-          });
+            });
         }
       );
     });
