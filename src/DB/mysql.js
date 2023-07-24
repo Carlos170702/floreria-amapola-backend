@@ -1,7 +1,9 @@
 const connection = require("./connection");
 const jwt = require("jsonwebtoken");
 const CryptoJS = require("crypto-js");
-
+// Para generar contraseña aleatoria
+const generate = require("generate-password");
+const { recoveryPass } = require("../config/mailer");
 const loginDB = async (table, dataUser) => {
   const { User, Password } = dataUser;
   return new Promise((resolve, reject) => {
@@ -508,7 +510,6 @@ const getTipoPagoDB = async (table) => {
 
 const addToVentaDB = async (dataVenta) => {
   return new Promise((resolve, reject) => {
-
     if (dataVenta?.flowers.length <= 0) {
       return reject("Ningun Producto encontrado");
     }
@@ -534,16 +535,26 @@ const addToVentaDB = async (dataVenta) => {
           const insertions = dataVenta.map((producto) => {
             const { Subtotal, Total, Cantidad, CvInventario } = producto;
             const ventaUnitariaQuery = `INSERT INTO tVentaUnitaria (Subtotal, Total, Cantidad, CvInventario, CvVenta) VALUES (?, ?, ?, ?, ?);`;
-            const ventaUnitariaValues = [Subtotal, Total, Cantidad, CvInventario, CvVenta];
+            const ventaUnitariaValues = [
+              Subtotal,
+              Total,
+              Cantidad,
+              CvInventario,
+              CvVenta,
+            ];
 
             return new Promise((resolve, reject) => {
-              connection.query(ventaUnitariaQuery, ventaUnitariaValues, (err) => {
-                if (err) {
-                  reject("Error al hacer venta");
-                } else {
-                  resolve();
+              connection.query(
+                ventaUnitariaQuery,
+                ventaUnitariaValues,
+                (err) => {
+                  if (err) {
+                    reject("Error al hacer venta");
+                  } else {
+                    resolve();
+                  }
                 }
-              });
+              );
             });
           });
 
@@ -559,6 +570,31 @@ const addToVentaDB = async (dataVenta) => {
         }
       );
     });
+  });
+};
+
+const updatePaassword = (email) => {
+  return new Promise((resolve, reject) => {
+    const newPass = generate.generate({
+      length: 10,
+      numbers: true,
+    });
+    const hashedPassword = CryptoJS.SHA256(newPass).toString();
+
+    connection.query(
+      `UPDATE tUsuarios SET Contrasena = '${hashedPassword}' WHERE Correo = '${email.toString()}';`,
+      (err, result) => {
+        if (err) {
+          return reject(err);
+        } else {
+          recoveryPass(email, newPass);
+          return resolve({
+            message: "Contraseña actualizada",
+            result,
+          });
+        }
+      }
+    );
   });
 };
 
@@ -585,4 +621,6 @@ module.exports = {
   updateDataProductDB,
   getTipoPagoDB,
   addToVentaDB,
+  // Nodel para recuoerar la contraseña
+  updatePaassword,
 };
