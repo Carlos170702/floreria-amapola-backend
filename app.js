@@ -13,7 +13,11 @@ app.set("port", config.app.port);
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors());
+app.use(
+  cors({
+    origin: "*", // Permitir solicitudes desde cualquier origen
+  })
+);
 
 // routes
 app.use("/api/floreria", usuarios);
