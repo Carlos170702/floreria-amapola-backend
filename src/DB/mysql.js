@@ -63,6 +63,7 @@ const getFlowersDB = async (table) => {
 const getColorsDB = async (table) => {
   return new Promise((resolve, reject) => {
     connection.query(`SELECT * FROM ${table};`, (err, result) => {
+      console.log(err)
       return !!err ? reject(err) : resolve(result);
     });
   });
